@@ -2,6 +2,8 @@ package com.coolweather.android.util;
 
 import android.app.Activity;
 
+import com.coolweather.android.exception.NotCreatedObjectException;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -14,9 +16,11 @@ public class ActivityCollector {
 
     private static List<Activity> activities = new ArrayList<>();
 
+    private static final String TAG = LogUtil.TAG_HEAD + "ActivityCollector";
+
 
     private ActivityCollector() {
-        throw new IllegalStateException("You cannot create the class's object!");
+        throw new NotCreatedObjectException();
     }
 
 
@@ -27,6 +31,7 @@ public class ActivityCollector {
      * @return true
      */
     public static boolean addActivity(Activity activity) {
+        LogUtil.v(TAG, "addActivity: 添加 " + activity.getClass().getSimpleName() + " 对象");
         return activities.add(activity);
     }
 
@@ -37,6 +42,7 @@ public class ActivityCollector {
      * @return 如果 acitivity 存在于 ActivityCollector 中，返回 true，否则返回 false
      */
     public static boolean removeActivity(Activity activity) {
+        LogUtil.v(TAG, "removeActivity: 移除 " + activity.getClass().getSimpleName() + " 对象");
         return activities.remove(activity);
     }
 
@@ -47,6 +53,7 @@ public class ActivityCollector {
         for (Activity activity : activities) {
             if (!activity.isFinishing()) {
                 activity.finish();
+                LogUtil.v(TAG, "finishAll: 终结 " + activity.getClass().getSimpleName() + " 对象");
             }
         }
     }

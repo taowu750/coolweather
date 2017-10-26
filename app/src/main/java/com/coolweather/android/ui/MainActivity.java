@@ -3,6 +3,7 @@ package com.coolweather.android.ui;
 import android.os.Bundle;
 
 import com.coolweather.android.R;
+import com.coolweather.android.app.BaseActivity;
 
 public class MainActivity extends BaseActivity {
 

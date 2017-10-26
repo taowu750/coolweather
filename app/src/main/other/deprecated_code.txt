@@ -1,0 +1,412 @@
+package com.coolweather.android.app.config;
+
+import android.content.Context;
+import android.content.SharedPreferences;
+
+import com.coolweather.android.app.BaseApplication;
+import com.coolweather.android.db.City;
+import com.coolweather.android.db.Province;
+import com.coolweather.android.exception.NotCreatedObjectException;
+import com.coolweather.android.util.AreaDataParseUtil;
+import com.coolweather.android.util.HttpUtil;
+import com.coolweather.android.util.LogUtil;
+
+import org.litepal.crud.DataSupport;
+import org.litepal.tablemanager.Connector;
+
+import java.io.IOException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.List;
+import java.util.Locale;
+
+import okhttp3.Call;
+import okhttp3.Callback;
+import okhttp3.Response;
+
+/**
+ * 用来配置省市县数据库。从服务器上获取数据，将他们加载到数据库中。
+ */
+
+public class AreaDataConfig {
+
+    private static final String TAG = LogUtil.TAG_HEAD + "AreaDataConfig";
+
+    private static final String CONFIGURE_PATH = "area_data_configure";
+    private static final String TYPE_HAS_CONFIGURED = "hasConfigured";
+    private static final String TYPE_CONFIGURE_PROVINCES_COUNT = "configureProvincesCount";
+    private static final String TYPE_CONFIGURE_PROVINCES_TIME = "configureProvincesTime";
+    private static final String TYPE_CONFIGURE_CITIES_COUNT = "configureCitiesCount";
+    private static final String TYPE_CONFIGURE_CITIES_TIME = "configureCitiesTime";
+    private static final String TYPE_CONFIGURE_ALL_CITIES_COUNT = "configureAllCitiesCount";
+    private static final String TYPE_CONFIGURE_ALL_CITIES_TIME = "configureAllCitiesTime";
+    private static final String TYPE_CONFIGURE_COUNTIES_COUNT = "configureCountiesCount";
+    private static final String TYPE_CONFIGURE_COUNTIES_TIME = "configureCountiesTime";
+    private static final String TYPE_CONFIGURE_ALL_COUNTIES_COUNT = "configureAllCountiesCount";
+    private static final String TYPE_CONFIGURE_ALL_COUNTIES_TIME = "configureAllCountiesTime";
+
+    private static SharedPreferences config;
+
+
+    private AreaDataConfig() {
+        throw new NotCreatedObjectException();
+    }
+
+
+    /*
+      当数据库未创建时创建数据库，并配置它。
+     */
+    static {
+        if (!hasConfigured()) {
+            Connector.getDatabase();
+            initialConfigureFile();
+            configureAllCounties(new DefaultExceptionHandler());
+
+            LogUtil.v(TAG, "static block: 初始化");
+        }
+    }
+
+
+    /**
+     * 当数据库还未创建时，创建数据库并加载所有数据。
+     */
+    public static void initial() {
+    }
+
+    /**
+     * 为数据库配置所有省份的信息。
+     *
+     * @param handler 异常处理器，发生异常时将会回调这个函数接口
+     */
+    public static void configureProvinces(ExceptionHandler handler) {
+        String provincesAddr = AreaDataParseUtil.PROVINCE_DATA_ADDRESS;
+        HttpUtil.sendRequest(provincesAddr, new Callback() {
+            @Override
+            public void onFailure(Call call, IOException e) {
+                handler.onFailure(e);
+            }
+
+            @Override
+            public void onResponse(Call call, Response response) throws IOException {
+                String provinceData = response.body().string();
+                boolean result = AreaDataParseUtil.handleProvinceResponse(provinceData);
+                if (!result) {
+                    onFailure(call, new IOException("Failed to obtain provincial data!"));
+                } else {
+                    refreshProvincesConfig();
+
+                    LogUtil.v(TAG, "configureProvinces: 次数-" + getProvincesCount() + ", 时间-" + getProvincesTime());
+                }
+            }
+        });
+    }
+
+    /**
+     * 根据给定的省份编码配置该省份的所有城市数据，如果省份数据没有被配置，将配置所有省份数据。
+     *
+     * @param provinceCode 省份编码
+     * @param handler      异常处理器，发生异常时将会回调这个函数接口
+     */
+    public static void configureCities(int provinceCode, ExceptionHandler handler) {
+        String citiesAddr = AreaDataParseUtil.PROVINCE_DATA_ADDRESS + "/" + provinceCode;
+        List<Province> provinceList = DataSupport.where("provinceCode=?", String.valueOf(provinceCode))
+                .find(Province.class);
+        Province province;
+
+        if (provinceList.isEmpty()) {
+            configureProvinces(handler);
+            provinceList = DataSupport.where("provinceCode=?", String.valueOf(provinceCode))
+                    .find(Province.class);
+            if (provinceList.isEmpty()) {
+                return;
+            }
+        }
+        province = provinceList.get(0);
+        HttpUtil.sendRequest(citiesAddr, new Callback() {
+            @Override
+            public void onFailure(Call call, IOException e) {
+                handler.onFailure(e);
+            }
+
+            @Override
+            public void onResponse(Call call, Response response) throws IOException {
+                String citiesData = response.body().string();
+                boolean result = AreaDataParseUtil.handleCityResponse(citiesData, province.getId());
+                if (!result) {
+                    onFailure(call, new IOException("Failed to obtain \"" + province.getProvinceName() + "\" cities " +
+                            "data!"));
+                } else {
+                    refreshCitiesConfig();
+
+                    LogUtil.v(TAG, "configureCities: 次数-" + getCitiesCount() + ", 时间-" + getCitiesTime());
+                }
+            }
+        });
+    }
+
+    /**
+     * 配置所有的城市数据，如果省份数据没有被配置，将先配置省份数据，然后再配置城市数据。
+     *
+     * @param handler 异常处理器，发生异常时将会回调这个函数接口
+     */
+    public static void configureAllCities(ExceptionHandler handler) {
+        List<Province> provinces = DataSupport.findAll(Province.class);
+        if (provinces.isEmpty()) {
+            configureProvinces(handler);
+            provinces = DataSupport.findAll(Province.class);
+            if (provinces.isEmpty()) {
+                return;
+            }
+        }
+        for (Province province : provinces) {
+            configureCities(province.getProvinceCode(), handler);
+        }
+        refreshAllCitiesConfig();
+
+        LogUtil.v(TAG, "configureAllCities: 次数-" + getAllCitiesCount() + ", 时间-" + getAllCitiesTime());
+    }
+
+    /**
+     * 根据给定的省份编码和城市编码配置该省份城市下的所有县城数据，如果城市数据没有被配置，将配置所有城市数据。
+     *
+     * @param provinceCode 省份编码
+     * @param cityCode     城市编码
+     * @param handler      异常处理器，发生异常时将会回调这个函数接口
+     */
+    public static void configureCounties(int provinceCode, int cityCode, ExceptionHandler handler) {
+        String countiesAddr = AreaDataParseUtil.PROVINCE_DATA_ADDRESS + "/" + provinceCode + "/" + cityCode;
+        List<City> cityList = DataSupport.where("cityCode=?", String.valueOf(cityCode))
+                .find(City.class);
+        City city;
+
+        if (cityList.isEmpty()) {
+            configureCities(provinceCode, handler);
+            cityList = DataSupport.where("cityCode=?", String.valueOf(cityCode))
+                    .find(City.class);
+            if (cityList.isEmpty()) {
+                return;
+            }
+        }
+        city = cityList.get(0);
+        HttpUtil.sendRequest(countiesAddr, new Callback() {
+            @Override
+            public void onFailure(Call call, IOException e) {
+                handler.onFailure(e);
+            }
+
+            @Override
+            public void onResponse(Call call, Response response) throws IOException {
+                String countiesData = response.body().string();
+                boolean result = AreaDataParseUtil.handleCountyResponse(countiesData, city.getId());
+                if (!result) {
+                    onFailure(call, new IOException("Failed to obtain \"" + city.getCityName() + "\" counties data!"));
+                } else {
+                    refreshCountiesConfig();
+
+                    LogUtil.v(TAG, "configureCounties: 次数-" + getCountiesCount() + ", 时间-" + getCountiesTime());
+                }
+            }
+        });
+    }
+
+    /**
+     * 配置所有的县城数据，如果省份和城市数据没有被配置，将先配置省份和城市数据，然后再配置县城数据。
+     *
+     * @param handler 异常处理器，发生异常时将会回调这个函数接口
+     */
+    public static void configureAllCounties(ExceptionHandler handler) {
+        configureAllCities(handler);
+        List<Province> provinces = DataSupport.findAll(Province.class);
+        if (!provinces.isEmpty()) {
+            for (Province province : provinces) {
+                List<City> cities = DataSupport.where("provinceid=?", String.valueOf(province.getId()))
+                        .find(City.class);
+                for (City city : cities) {
+                    configureCounties(province.getProvinceCode(), city.getCityCode(), handler);
+                }
+            }
+            refreshAllCountiesConfig();
+
+            LogUtil.v(TAG, "configureAllCounties: 次数-" + getAllCountiesCount() + ", 时间-" + getAllCountiesTime());
+        }
+    }
+
+
+    private static SharedPreferences getConfigureFile() {
+        Context context = BaseApplication.getContext();
+
+        return context.getSharedPreferences(CONFIGURE_PATH, Context.MODE_PRIVATE);
+    }
+
+    /**
+     * 判断省市县数据库是否已经被配置过
+     *
+     * @return 数据库被配置过，返回 true，否则返回false
+     */
+    private static boolean hasConfigured() {
+        config = getConfigureFile();
+
+        return config.getBoolean(TYPE_HAS_CONFIGURED, false);
+    }
+
+    private static void initialConfigureFile() {
+        SharedPreferences.Editor editor = config.edit();
+
+        boolean hasConfigured = config.getBoolean(TYPE_HAS_CONFIGURED, false);
+        if (!hasConfigured) {
+            editor.putBoolean(TYPE_HAS_CONFIGURED, true);
+        }
+        int configureProvincesCount = config.getInt(TYPE_CONFIGURE_PROVINCES_COUNT, -1);
+        if (configureProvincesCount == -1) {
+            editor.putInt(TYPE_CONFIGURE_PROVINCES_COUNT, 0);
+        }
+        String configureProvincesTime = config.getString(TYPE_CONFIGURE_PROVINCES_TIME, null);
+        if (configureProvincesTime == null) {
+            editor.putString(TYPE_CONFIGURE_PROVINCES_TIME, "");
+        }
+
+        int configureCitiesCount = config.getInt(TYPE_CONFIGURE_CITIES_COUNT, -1);
+        if (configureCitiesCount == -1) {
+            editor.putInt(TYPE_CONFIGURE_CITIES_COUNT, 0);
+        }
+        String configureCitiesTime = config.getString(TYPE_CONFIGURE_CITIES_TIME, null);
+        if (configureCitiesTime == null) {
+            editor.putString(TYPE_CONFIGURE_CITIES_TIME, "");
+        }
+        int configureAllCitiesCount = config.getInt(TYPE_CONFIGURE_ALL_CITIES_COUNT, -1);
+        if (configureAllCitiesCount == -1) {
+            editor.putInt(TYPE_CONFIGURE_ALL_CITIES_COUNT, 0);
+        }
+        String configureAllCitiesTime = config.getString(TYPE_CONFIGURE_ALL_CITIES_TIME, null);
+        if (configureAllCitiesTime == null) {
+            editor.putString(TYPE_CONFIGURE_ALL_CITIES_TIME, "");
+        }
+
+        int configureCountiesCount = config.getInt(TYPE_CONFIGURE_COUNTIES_COUNT, -1);
+        if (configureCountiesCount == -1) {
+            editor.putInt(TYPE_CONFIGURE_COUNTIES_COUNT, 0);
+        }
+        String configureCountiesTime = config.getString(TYPE_CONFIGURE_COUNTIES_TIME, null);
+        if (configureCountiesTime == null) {
+            editor.putString(TYPE_CONFIGURE_COUNTIES_TIME, "");
+        }
+        int configureAllCountiesCount = config.getInt(TYPE_CONFIGURE_ALL_COUNTIES_COUNT, -1);
+        if (configureAllCountiesCount == -1) {
+            editor.putInt(TYPE_CONFIGURE_ALL_COUNTIES_COUNT, 0);
+        }
+        String configureAllCountiesTime = config.getString(TYPE_CONFIGURE_ALL_COUNTIES_TIME, null);
+        if (configureAllCountiesTime == null) {
+            editor.putString(TYPE_CONFIGURE_ALL_COUNTIES_TIME, "");
+        }
+
+        editor.apply();
+    }
+
+    private static void refreshProvincesConfig() {
+        SharedPreferences.Editor editor = config.edit();
+
+        editor.putInt(TYPE_CONFIGURE_PROVINCES_COUNT, config.getInt(TYPE_CONFIGURE_PROVINCES_COUNT, 0) + 1);
+        editor.putString(TYPE_CONFIGURE_PROVINCES_TIME, getCurrentTime());
+        editor.apply();
+    }
+
+    private static void refreshCitiesConfig() {
+        SharedPreferences.Editor editor = config.edit();
+
+        editor.putInt(TYPE_CONFIGURE_CITIES_COUNT, config.getInt(TYPE_CONFIGURE_CITIES_COUNT, 0) + 1);
+        editor.putString(TYPE_CONFIGURE_CITIES_TIME, getCurrentTime());
+        editor.apply();
+    }
+
+    private static void refreshAllCitiesConfig() {
+        SharedPreferences.Editor editor = config.edit();
+
+        editor.putInt(TYPE_CONFIGURE_ALL_CITIES_COUNT, config.getInt(TYPE_CONFIGURE_ALL_CITIES_COUNT, 0) + 1);
+        editor.putString(TYPE_CONFIGURE_ALL_CITIES_TIME, getCurrentTime());
+        editor.apply();
+    }
+
+    private static void refreshCountiesConfig() {
+        SharedPreferences.Editor editor = config.edit();
+
+        editor.putInt(TYPE_CONFIGURE_COUNTIES_COUNT, config.getInt(TYPE_CONFIGURE_COUNTIES_COUNT, 0) + 1);
+        editor.putString(TYPE_CONFIGURE_COUNTIES_TIME, getCurrentTime());
+        editor.apply();
+    }
+
+    private static void refreshAllCountiesConfig() {
+        SharedPreferences.Editor editor = config.edit();
+
+        editor.putInt(TYPE_CONFIGURE_ALL_COUNTIES_COUNT, config.getInt(TYPE_CONFIGURE_ALL_COUNTIES_COUNT, 0) + 1);
+        editor.putString(TYPE_CONFIGURE_ALL_COUNTIES_TIME, getCurrentTime());
+        editor.apply();
+    }
+
+    private static int getProvincesCount() {
+        return config.getInt(TYPE_CONFIGURE_PROVINCES_COUNT, 0);
+    }
+
+    private static String getProvincesTime() {
+        return config.getString(TYPE_CONFIGURE_PROVINCES_TIME, null);
+    }
+
+    private static int getCitiesCount() {
+        return config.getInt(TYPE_CONFIGURE_CITIES_COUNT, 0);
+    }
+
+    private static String getCitiesTime() {
+        return config.getString(TYPE_CONFIGURE_CITIES_TIME, null);
+    }
+
+    private static int getAllCitiesCount() {
+        return config.getInt(TYPE_CONFIGURE_ALL_CITIES_COUNT, 0);
+    }
+
+    private static String getAllCitiesTime() {
+        return config.getString(TYPE_CONFIGURE_ALL_CITIES_TIME, null);
+    }
+
+    private static int getCountiesCount() {
+        return config.getInt(TYPE_CONFIGURE_COUNTIES_COUNT, 0);
+    }
+
+    private static String getCountiesTime() {
+        return config.getString(TYPE_CONFIGURE_COUNTIES_TIME, null);
+    }
+
+    private static int getAllCountiesCount() {
+        return config.getInt(TYPE_CONFIGURE_ALL_COUNTIES_COUNT, 0);
+    }
+
+    private static String getAllCountiesTime() {
+        return config.getString(TYPE_CONFIGURE_ALL_COUNTIES_TIME, null);
+    }
+
+    private static String getCurrentTime() {
+        Date date = new Date();
+        SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss E", Locale.CHINA);
+
+        return format.format(date);
+    }
+
+
+    /**
+     * 当服务器请求出现异常时，回调这个函数接口
+     */
+    @FunctionalInterface
+    public interface ExceptionHandler {
+
+        void onFailure(IOException e);
+    }
+
+    /**
+     * 默认的异常监听器，在控制台上打印错误日志
+     */
+    public static class DefaultExceptionHandler implements ExceptionHandler {
+
+        @Override
+        public void onFailure(IOException e) {
+            LogUtil.e(TAG, "DefaultExceptionHandler.onFailure: IOException-" + e.getMessage());
+        }
+    }
+}

@@ -3,6 +3,8 @@ package com.coolweather.android.app;
 import android.app.Application;
 import android.content.Context;
 
+import com.coolweather.android.util.LogUtil;
+
 import org.litepal.LitePal;
 
 /**
@@ -12,6 +14,8 @@ import org.litepal.LitePal;
 public class BaseApplication extends Application {
 
     private static Context context;
+
+    private static final String TAG = LogUtil.TAG_HEAD + "BaseApplication";
 
 
     public static Context getContext() {
@@ -24,5 +28,6 @@ public class BaseApplication extends Application {
         super.onCreate();
         context = getApplicationContext();
         LitePal.initialize(context);
+        LogUtil.v(TAG, "onCreate: 创建 BaseApplication，并初始化 LitePalApplication");
     }
 }

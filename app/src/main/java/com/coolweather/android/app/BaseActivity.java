@@ -28,7 +28,7 @@ public class BaseActivity extends AppCompatActivity {
     private ForceOfflineReceiver receiver;
     private LocalBroadcastManager localBroadcastManager;
 
-    private static final String TAG = "BaseActivity";
+    private static final String TAG = LogUtil.TAG_HEAD + "BaseActivity";
 
 
     /**
@@ -38,6 +38,7 @@ public class BaseActivity extends AppCompatActivity {
         if (receiver != null) {
             Intent intent = new Intent(FORCE_FINISH);
             localBroadcastManager.sendBroadcast(intent);
+            LogUtil.v(TAG, "forceFinish: 强制终结应用");
         }
     }
 
@@ -45,7 +46,7 @@ public class BaseActivity extends AppCompatActivity {
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        LogUtil.d(TAG, getClass().getSimpleName());
+        LogUtil.d(TAG, "onCreate: 当前活动 " + getClass().getSimpleName());
         ActivityCollector.addActivity(this);
     }
 
@@ -56,6 +57,7 @@ public class BaseActivity extends AppCompatActivity {
         receiver = new ForceOfflineReceiver();
         localBroadcastManager = LocalBroadcastManager.getInstance(this);
         localBroadcastManager.registerReceiver(receiver, intentFilter);
+        LogUtil.v(TAG, "onResume: 注册 ForceOfflineReceiver");
     }
 
     @Override
@@ -63,6 +65,7 @@ public class BaseActivity extends AppCompatActivity {
         super.onPause();
         if (receiver != null) {
             localBroadcastManager.unregisterReceiver(receiver);
+            LogUtil.v(TAG, "onResume: 取消注册 ForceOfflineReceiver");
         }
     }
 
@@ -87,6 +90,7 @@ public class BaseActivity extends AppCompatActivity {
             });
             builder.setNegativeButton("否", null);
             builder.show();
+            LogUtil.v(TAG, "ForceOfflineReceiver.onReceive: 接收到强制终结应用广播");
         }
     }
 }

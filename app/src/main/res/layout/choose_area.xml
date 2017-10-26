@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 显示省市县数据的碎片布局，因为后面还需要复用这个功能，所以使用碎片，这样需要复用时直接引用碎片就可以了 -->
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#fff"
+    android:orientation="vertical">
+
+    <!-- 碎片中最好不要直接使用 ActionBar 或 ToolBar，否则复用的时候会出现一些不好的效果 -->
+    <RelativeLayout
+        android:layout_width="match_parent"
+        android:layout_height="?attr/actionBarSize"
+        android:background="?attr/colorPrimary">
+
+        <TextView
+            android:id="@+id/title_text"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_centerInParent="true"
+            android:textColor="#fff"
+            android:textSize="20sp"/>
+
+        <Button
+            android:id="@+id/back_button"
+            android:layout_width="25dp"
+            android:layout_height="25dp"
+            android:layout_alignParentLeft="true"
+            android:layout_centerVertical="true"
+            android:layout_marginLeft="10dp"
+            android:background="@drawable/ic_back"/>
+
+    </RelativeLayout>
+
+    <!-- 之所以这里使用 ListView，是因为它会自动给每个子项添加一条分隔线，而如果使用 RecyclerView 实现同样的
+            功能就会比较麻烦 -->
+    <ListView
+        android:id="@+id/area_data_list_view"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"/>
+
+</LinearLayout>
