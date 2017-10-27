@@ -13,6 +13,9 @@ import org.litepal.LitePal;
 
 public class BaseApplication extends Application {
 
+    public static final String HE_WEATHER_KEY = "9188d0ffdb3f447b937ece3a3b2e3550";
+
+
     private static Context context;
 
     private static final String TAG = LogUtil.TAG_HEAD + "BaseApplication";

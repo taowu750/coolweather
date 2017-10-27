@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<!-- activity_weather 将会非常长，对于这种非常长的布局文件，可以将其拆分成几个部分，
+    然后通过 <include> 将各个部分应用进来-->
+<FrameLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/colorPrimary">
+    
+    <ScrollView
+        android:id="@+id/weather_layout"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scrollbars="none"
+        android:overScrollMode="never">
+        
+        <LinearLayout
+            android:orientation="vertical"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
+
+            <include layout="@layout/weather_title"/>
+
+            <include layout="@layout/weather_now"/>
+
+            <include layout="@layout/weather_forecast"/>
+
+            <include layout="@layout/weather_aqi"/>
+
+            <include layout="@layout/weather_suggestion"/>
+
+        </LinearLayout>
+
+    </ScrollView>
+
+</FrameLayout>

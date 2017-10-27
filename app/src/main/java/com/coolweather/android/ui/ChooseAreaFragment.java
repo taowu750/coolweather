@@ -2,6 +2,7 @@ package com.coolweather.android.ui;
 
 import android.app.ProgressDialog;
 import android.os.Bundle;
+import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.v4.app.Fragment;
 import android.view.LayoutInflater;
@@ -87,9 +88,9 @@ public class ChooseAreaFragment extends Fragment {
             savedInstanceState) {
         View view = inflater.inflate(R.layout.choose_area, container, false);
 
-        titleText = (TextView) view.findViewById(R.id.title_text);
-        backButton = (Button) view.findViewById(R.id.back_button);
-        areaDataListView = (ListView) view.findViewById(R.id.area_data_list_view);
+        titleText = view.findViewById(R.id.title_text);
+        backButton = view.findViewById(R.id.back_button);
+        areaDataListView = view.findViewById(R.id.area_data_list_view);
 
         adapter = new ArrayAdapter<>(getContext(), android.R.layout.simple_list_item_1, dataList);
         areaDataListView.setAdapter(adapter);
@@ -109,6 +110,9 @@ public class ChooseAreaFragment extends Fragment {
             } else if (currentLevel == LEVEL_CITY) {
                 selectedCity = cityList.get(position);
                 queryCounties();
+            } else if (currentLevel == LEVEL_COUNTY) {
+                String weatherId = countyList.get(position).getWeatherId();
+                WeatherActivity.activityStart(getActivity(), weatherId);
             }
 
             LogUtil.d(TAG, "onActivityCreated: areaDataListView 点击事件响应");
@@ -156,7 +160,7 @@ public class ChooseAreaFragment extends Fragment {
     private void queryCities() {
         titleText.setText(selectedProvince.getProvinceName());
         backButton.setVisibility(View.VISIBLE);
-        // ORM 类的 id 属性在数据库中会变成 "小写类名+id" 的格式
+        // ORM 类的域会变为小写格式
         cityList = DataSupport.where("provinceid=?", String.valueOf(selectedProvince.getId()))
                 .find(City.class);
         if (cityList.size() > 0) {
@@ -215,7 +219,7 @@ public class ChooseAreaFragment extends Fragment {
         showProgressDialog();
         HttpUtil.sendRequest(address, new Callback() {
             @Override
-            public void onFailure(Call call, IOException e) {
+            public void onFailure(@NonNull Call call, @NonNull IOException e) {
                 // 通过 runOnUiThread() 方法回到主线程处理逻辑
                 getActivity().runOnUiThread(() -> {
                     closeProgressDialog();
@@ -224,7 +228,7 @@ public class ChooseAreaFragment extends Fragment {
             }
 
             @Override
-            public void onResponse(Call call, Response response) throws IOException {
+            public void onResponse(@NonNull Call call, @NonNull Response response) throws IOException {
                 String responseText = response.body().string();
                 boolean result = false;
                 if (type == LEVEL_PROVINCE) {
