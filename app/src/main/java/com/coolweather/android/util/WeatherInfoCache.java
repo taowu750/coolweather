@@ -17,8 +17,9 @@ public class WeatherInfoCache {
     private static final String WEATHER_INFO_PATH = "weather";
     private static final String WEATHER_INFO_KEY = "weather";
     private static final String WEATHER_INFO_TIME = "time";
+    private static final String BING_PIC_KEY = "bing_pic";
 
-    // ms 为单位，1 小时
+    // 天气数据缓存的默认时间，ms 为单位，1 小时
     private static final long DEFAULT_MAX_REFRESH_TIME_INTERVAL = 60 * 60 * 1000L;
 
 
@@ -92,6 +93,23 @@ public class WeatherInfoCache {
         editor.apply();
 
         LogUtil.d(TAG, "putWeatherInfo: 更新缓存的天气数据，时间是 " + prefs.getLong(WEATHER_INFO_TIME, -1L));
+    }
+
+    /**
+     * 将必应每日一图信息保存到缓存中。
+     *
+     * @param bingPic 必应每日一图
+     */
+    public static void putBingPic(String bingPic) {
+        if (prefs == null) {
+            prefs = BaseApplication.getContext().getSharedPreferences(WEATHER_INFO_PATH, Context.MODE_PRIVATE);
+        }
+
+        editor = prefs.edit();
+        editor.putString(BING_PIC_KEY, bingPic);
+        editor.apply();
+
+        LogUtil.d(TAG, "putBingPic: 更新缓存的必应每日一图-" + prefs.getString(BING_PIC_KEY, null));
     }
 
     /**

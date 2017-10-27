@@ -19,6 +19,7 @@ import com.coolweather.android.app.BaseActivity;
 import com.coolweather.android.app.BaseApplication;
 import com.coolweather.android.gson.Forecast;
 import com.coolweather.android.gson.Weather;
+import com.coolweather.android.service.AutoUpdateService;
 import com.coolweather.android.util.HttpUtil;
 import com.coolweather.android.util.LogUtil;
 import com.coolweather.android.util.WeatherDataParseUtil;
@@ -154,12 +155,16 @@ public class WeatherActivity extends BaseActivity {
         if (weatherId != null) {
             weatherLayout.setVisibility(View.INVISIBLE);
             requestWeather(weatherId);
+
+            LogUtil.d(TAG, "viewSetting: 天气 id 从 MainActivity 传来-" + weatherId);
         } else {
             String weatherInfo = WeatherInfoCache.getWeatherInfo();
             if (weatherInfo != null) {
                 Weather weather = WeatherDataParseUtil.handleWeatherResponse(weatherInfo);
                 weatherId = weather.basic.weatherId;
                 showWeatherInfo(weather);
+
+                LogUtil.d(TAG, "viewSetting: 天气 id 从缓存中取出-" + weatherId);
             } else {
                 Toast.makeText(this, "很遗憾，没有接收到任何对天气数据的请求", Toast.LENGTH_SHORT).show();
 
@@ -167,14 +172,12 @@ public class WeatherActivity extends BaseActivity {
             }
         }
 
-        final String finalWeatherId = weatherId;
         swipeRefresh.setOnRefreshListener(() -> {
-            if (finalWeatherId != null) {
-                refreshData(finalWeatherId);
+            String cacheWeatherId = getCacheWeatherId();
+            if (cacheWeatherId != null) {
+                refreshData(cacheWeatherId);
             } else {
-                Toast.makeText(this, "很遗憾，没有接收到任何对天气数据的请求", Toast.LENGTH_SHORT).show();
-
-                LogUtil.w(TAG, "handleWeatherInfo.OnRefreshListener: 出现 bug，WeatherActivity 没有被正常启动");
+                Toast.makeText(this, "刷新失败，请重新选择", Toast.LENGTH_SHORT).show();
             }
         });
 
@@ -222,51 +225,75 @@ public class WeatherActivity extends BaseActivity {
      * @param weather Weather 对象
      */
     private void showWeatherInfo(Weather weather) {
-        String cityName = weather.basic.cityName;
-        String updateTime = weather.basic.update.updateTime.split(" ")[1];
-        String degree = weather.now.temperature + "度";
-        String weatherInfo = weather.now.more.info;
+        if (weather != null && WeatherDataParseUtil.WEATHER_STATUS_OK.equals(weather.status)) {
+            String cityName = weather.basic.cityName;
+            String updateTime = weather.basic.update.updateTime.split(" ")[1];
+            String degree = weather.now.temperature + "度";
+            String weatherInfo = weather.now.more.info;
 
-        // weather_title 部分
-        titleCity.setText(cityName);
-        titleUpdateTime.setText(updateTime);
+            // weather_title 部分
+            titleCity.setText(cityName);
+            titleUpdateTime.setText(updateTime);
 
-        // weather_now 部分
-        degreeText.setText(degree);
-        weatherInfoText.setText(weatherInfo);
+            // weather_now 部分
+            degreeText.setText(degree);
+            weatherInfoText.setText(weatherInfo);
 
-        // weather_forecast 部分
-        // 之所以采用这种动态添加 View 的方式，是因为预测的数据数量是变化的，无法知道有多少
-        forecastLayout.removeAllViews();
-        for (Forecast forecast : weather.forecastList) {
-            View view = LayoutInflater.from(this).inflate(R.layout.weather_forecast_item, forecastLayout, false);
-            TextView dateText = view.findViewById(R.id.date_text);
-            TextView infoText = view.findViewById(R.id.info_text);
-            TextView maxText = view.findViewById(R.id.max_text);
-            TextView minText = view.findViewById(R.id.min_text);
+            // weather_forecast 部分
+            // 之所以采用这种动态添加 View 的方式，是因为预测的数据数量是变化的，无法知道有多少
+            forecastLayout.removeAllViews();
+            for (Forecast forecast : weather.forecastList) {
+                View view = LayoutInflater.from(this).inflate(R.layout.weather_forecast_item, forecastLayout, false);
+                TextView dateText = view.findViewById(R.id.date_text);
+                TextView infoText = view.findViewById(R.id.info_text);
+                TextView maxText = view.findViewById(R.id.max_text);
+                TextView minText = view.findViewById(R.id.min_text);
 
-            dateText.setText(forecast.date);
-            infoText.setText(forecast.more.info);
-            maxText.setText(forecast.temperature.max);
-            maxText.setText(forecast.temperature.min);
+                dateText.setText(forecast.date);
+                infoText.setText(forecast.more.info);
+                maxText.setText(forecast.temperature.max);
+                maxText.setText(forecast.temperature.min);
 
-            forecastLayout.addView(view);
+                forecastLayout.addView(view);
+            }
+
+            // weather_aqi 部分
+            if (weather.aqi != null) {
+                aqiText.setText(weather.aqi.city.aqi);
+                pm25Text.setText(weather.aqi.city.pm25);
+            }
+
+            // weather_suggestion 部分
+            String comfort = "舒适度：" + weather.suggestion.comfort.info;
+            String carWash = "洗车指数：" + weather.suggestion.carWash.info;
+            String sport = "运动建议：" + weather.suggestion.sport.info;
+            comfortText.setText(comfort);
+            carWashText.setText(carWash);
+            sportText.setText(sport);
+
+            weatherLayout.setVisibility(View.VISIBLE);
+
+            // 启动定时更新服务
+            Intent intent = new Intent(this, AutoUpdateService.class);
+            startService(intent);
+        } else {
+            Toast.makeText(WeatherActivity.this, "获取天气信息失败！", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    /**
+     * 返回缓存的天气 id。
+     *
+     * @return 缓存的天气 id
+     */
+    private String getCacheWeatherId() {
+        String weatherInfo = WeatherInfoCache.getWeatherInfo();
+        if (weatherInfo != null) {
+            Weather weather = WeatherDataParseUtil.handleWeatherResponse(weatherInfo);
+
+            return weather.basic.weatherId;
         }
 
-        // weather_aqi 部分
-        if (weather.aqi != null) {
-            aqiText.setText(weather.aqi.city.aqi);
-            pm25Text.setText(weather.aqi.city.pm25);
-        }
-
-        // weather_suggestion 部分
-        String comfort = "舒适度：" + weather.suggestion.comfort.info;
-        String carWash = "洗车指数：" + weather.suggestion.carWash.info;
-        String sport = "运动建议：" + weather.suggestion.sport.info;
-        comfortText.setText(comfort);
-        carWashText.setText(carWash);
-        sportText.setText(sport);
-
-        weatherLayout.setVisibility(View.VISIBLE);
+        return null;
     }
 }
