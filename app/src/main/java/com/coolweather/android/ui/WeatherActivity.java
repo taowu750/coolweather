@@ -3,8 +3,12 @@ package com.coolweather.android.ui;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
+import android.support.v4.view.GravityCompat;
+import android.support.v4.widget.DrawerLayout;
+import android.support.v4.widget.SwipeRefreshLayout;
 import android.view.LayoutInflater;
 import android.view.View;
+import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -56,6 +60,13 @@ public class WeatherActivity extends BaseActivity {
     private TextView carWashText;
     private TextView sportText;
 
+    // 下拉刷新天气数据
+    private SwipeRefreshLayout swipeRefresh;
+
+    // 通过滑动菜单的方式，使得用户能够在滑动菜单中自由选择要查看的城市
+    private DrawerLayout drawerLayout;
+    private Button navButton;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -63,7 +74,7 @@ public class WeatherActivity extends BaseActivity {
         setContentView(R.layout.activity_weather);
 
         initView();
-        handleWeatherInfo();
+        viewSetting();
     }
 
 
@@ -91,26 +102,53 @@ public class WeatherActivity extends BaseActivity {
 
 
     /**
+     * 关闭 WeatherActivity 的滑动菜单
+     */
+    public void closeDrawer() {
+        drawerLayout.closeDrawers();
+    }
+
+    /**
+     * 刷新天气数据
+     */
+    public void refreshData(String weatherId) {
+        swipeRefresh.setRefreshing(true);
+        requestWeather(weatherId);
+    }
+
+
+    /**
      * 初始化视图
      */
     private void initView() {
         weatherLayout = (ScrollView) findViewById(R.id.weather_layout);
+
         titleCity = (TextView) findViewById(R.id.title_city);
         titleUpdateTime = (TextView) findViewById(R.id.title_update_time);
+
         degreeText = (TextView) findViewById(R.id.degree_text);
         weatherInfoText = (TextView) findViewById(R.id.weather_info_text);
+
         forecastLayout = (LinearLayout) findViewById(R.id.forecast_layout);
+
         aqiText = (TextView) findViewById(R.id.aqi_text);
         pm25Text = (TextView) findViewById(R.id.pm25_txt);
+
         comfortText = (TextView) findViewById(R.id.comfort_text);
         carWashText = (TextView) findViewById(R.id.car_wash_text);
         sportText = (TextView) findViewById(R.id.sport_text);
+
+        swipeRefresh = (SwipeRefreshLayout) findViewById(R.id.swipe_refresh);
+        swipeRefresh.setColorSchemeResources(R.color.colorPrimary);
+
+        drawerLayout = (DrawerLayout) findViewById(R.id.drawer_layout);
+        navButton = (Button) findViewById(R.id.nav_button);
     }
 
     /**
-     * 处理天气信息
+     * 对控件进行设置
      */
-    private void handleWeatherInfo() {
+    private void viewSetting() {
         Intent intent = getIntent();
         String weatherId = intent.getStringExtra(INTENT_WEATHER_ID);
         if (weatherId != null) {
@@ -120,6 +158,7 @@ public class WeatherActivity extends BaseActivity {
             String weatherInfo = WeatherInfoCache.getWeatherInfo();
             if (weatherInfo != null) {
                 Weather weather = WeatherDataParseUtil.handleWeatherResponse(weatherInfo);
+                weatherId = weather.basic.weatherId;
                 showWeatherInfo(weather);
             } else {
                 Toast.makeText(this, "很遗憾，没有接收到任何对天气数据的请求", Toast.LENGTH_SHORT).show();
@@ -127,6 +166,19 @@ public class WeatherActivity extends BaseActivity {
                 LogUtil.w(TAG, "handleWeatherInfo: 出现 bug，WeatherActivity 没有被正常启动");
             }
         }
+
+        final String finalWeatherId = weatherId;
+        swipeRefresh.setOnRefreshListener(() -> {
+            if (finalWeatherId != null) {
+                refreshData(finalWeatherId);
+            } else {
+                Toast.makeText(this, "很遗憾，没有接收到任何对天气数据的请求", Toast.LENGTH_SHORT).show();
+
+                LogUtil.w(TAG, "handleWeatherInfo.OnRefreshListener: 出现 bug，WeatherActivity 没有被正常启动");
+            }
+        });
+
+        navButton.setOnClickListener((view) -> drawerLayout.openDrawer(GravityCompat.START));
     }
 
     /**
@@ -141,6 +193,7 @@ public class WeatherActivity extends BaseActivity {
             @Override
             public void onFailure(Call call, IOException e) {
                 runOnUiThread(() -> Toast.makeText(WeatherActivity.this, "获取天气信息失败！", Toast.LENGTH_SHORT).show());
+                swipeRefresh.setRefreshing(false);
 
                 LogUtil.e(TAG, "requestWeather: IOException-" + e.getMessage());
             }
@@ -157,6 +210,7 @@ public class WeatherActivity extends BaseActivity {
                     } else {
                         Toast.makeText(WeatherActivity.this, "获取天气信息失败！", Toast.LENGTH_SHORT).show();
                     }
+                    swipeRefresh.setRefreshing(false);
                 });
             }
         });

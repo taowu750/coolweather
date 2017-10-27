@@ -1,5 +1,6 @@
 package com.coolweather.android.ui;
 
+import android.app.Activity;
 import android.app.ProgressDialog;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
@@ -111,8 +112,16 @@ public class ChooseAreaFragment extends Fragment {
                 selectedCity = cityList.get(position);
                 queryCounties();
             } else if (currentLevel == LEVEL_COUNTY) {
+                Activity activity = getActivity();
                 String weatherId = countyList.get(position).getWeatherId();
-                WeatherActivity.activityStart(getActivity(), weatherId);
+                if (activity instanceof MainActivity) {
+                    WeatherActivity.activityStart(getActivity(), weatherId);
+                    activity.finish();
+                } else if (activity instanceof WeatherActivity) {
+                    WeatherActivity weatherActivity = (WeatherActivity) activity;
+                    weatherActivity.closeDrawer();
+                    weatherActivity.refreshData(weatherId);
+                }
             }
 
             LogUtil.d(TAG, "onActivityCreated: areaDataListView 点击事件响应");

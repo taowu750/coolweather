@@ -15,6 +15,7 @@ public class MainActivity extends BaseActivity {
 
         if (WeatherInfoCache.hasWeatherInfoCache()) {
             WeatherActivity.activityStart(this);
+            finish();
         }
     }
 }
