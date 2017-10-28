@@ -7,41 +7,59 @@
     xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/colorPrimary">
+    android:background="@color/colorPrimary"
+    android:fitsSystemWindows="true">
 
     <android.support.v4.widget.DrawerLayout
         android:id="@+id/drawer_layout"
         android:layout_width="match_parent"
-        android:layout_height="match_parent">
+        android:layout_height="match_parent"
+        android:fitsSystemWindows="true">
 
         <android.support.v4.widget.SwipeRefreshLayout
             android:id="@+id/swipe_refresh"
             android:layout_width="match_parent"
-            android:layout_height="match_parent">
+            android:layout_height="match_parent"
+            android:fitsSystemWindows="true">
 
             <ScrollView
                 android:id="@+id/weather_layout"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:scrollbars="none"
-                android:overScrollMode="never">
+                android:overScrollMode="never"
+                android:fitsSystemWindows="true">
 
-                <LinearLayout
-                    android:orientation="vertical"
+                <FrameLayout
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content">
+                    android:layout_height="wrap_content"
+                    android:fitsSystemWindows="true">
 
-                    <include layout="@layout/weather_title"/>
+                    <ImageView
+                        android:id="@+id/background_view"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:scaleType="centerCrop"/>
 
-                    <include layout="@layout/weather_now"/>
+                    <LinearLayout
+                        android:orientation="vertical"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:fitsSystemWindows="true">
 
-                    <include layout="@layout/weather_forecast"/>
+                        <include layout="@layout/weather_title"/>
 
-                    <include layout="@layout/weather_aqi"/>
+                        <include layout="@layout/weather_now"/>
 
-                    <include layout="@layout/weather_suggestion"/>
+                        <include layout="@layout/weather_forecast"/>
 
-                </LinearLayout>
+                        <include layout="@layout/weather_aqi"/>
+
+                        <include layout="@layout/weather_suggestion"/>
+
+                    </LinearLayout>
+
+                </FrameLayout>
 
             </ScrollView>
 

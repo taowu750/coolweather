@@ -4,6 +4,7 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
+import android.graphics.Color;
 import android.graphics.drawable.Drawable;
 import android.os.Build;
 import android.os.Bundle;
@@ -11,15 +12,18 @@ import android.os.IBinder;
 import android.support.v4.view.GravityCompat;
 import android.support.v4.widget.DrawerLayout;
 import android.support.v4.widget.SwipeRefreshLayout;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.bumptech.glide.Glide;
 import com.coolweather.android.R;
 import com.coolweather.android.app.BaseActivity;
 import com.coolweather.android.app.BaseApplication;
@@ -75,10 +79,13 @@ public class WeatherActivity extends BaseActivity {
     private Button navButton;
 
     // WeatherActivity 的主界面，用来设置背景图
+    @Deprecated
     private ViewGroup mainLayout;
 
     // 用来绑定服务
+    @Deprecated
     private AutoUpdateService.WeatherBinder binder;
+    @Deprecated
     private ServiceConnection connection = new ServiceConnection() {
         @Override
         public void onServiceConnected(ComponentName componentName, IBinder iBinder) {
@@ -94,23 +101,28 @@ public class WeatherActivity extends BaseActivity {
         }
     };
 
+    // 用来设置背景图
+    private ImageView backgroundView;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        setStatusBarTransparent();
         setContentView(R.layout.activity_weather);
 
-        // bindService 会调用 Service 的 onCreate 方法，但是不会调用 startService 方法
-        Intent bindIntent = new Intent(this, AutoUpdateService.class);
-        bindService(bindIntent, connection, BIND_AUTO_CREATE);
+        // bindService 会调用 Service 的 onCreate 方法，但是不会调用 onStartCommand 方法
+//        Intent bindIntent = new Intent(this, AutoUpdateService.class);
+//        bindService(bindIntent, connection, BIND_AUTO_CREATE);
         initView();
         viewSetting();
+        setBackground();
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        unbindService(connection);
+//        unbindService(connection);
     }
 
     /**
@@ -137,6 +149,18 @@ public class WeatherActivity extends BaseActivity {
 
 
     /**
+     * 如果 Android 系统版本大于等于 5.0，就将它的系统状态栏设置为透明。
+     */
+    public void setStatusBarTransparent() {
+        if (Build.VERSION.SDK_INT >= 21) {
+            View decorView = getWindow().getDecorView();
+            // 这两个标志表示活动的布局会显示在系统的状态栏上
+            decorView.setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN | View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
+            getWindow().setStatusBarColor(Color.TRANSPARENT);
+        }
+    }
+
+    /**
      * 关闭 WeatherActivity 的滑动菜单
      */
     public void closeDrawer() {
@@ -156,12 +180,25 @@ public class WeatherActivity extends BaseActivity {
      *
      * @param pic 背景图
      */
+    @Deprecated
     public void setBackground(Drawable pic) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
             mainLayout.setBackground(pic);
             LogUtil.v(TAG, "setBackground: 设置背景图片成功");
         } else {
             LogUtil.w(TAG, "setBackground: 当前 Android 系统版本低于 4.1，无法使用该方法");
+        }
+    }
+
+    /**
+     * 设置 WeatherActivity 的背景图片。
+     */
+    public void setBackground() {
+        String backgroundPic = WeatherInfoCache.getBingPic();
+        if (backgroundPic != null) {
+            Glide.with(this).load(backgroundPic).into(backgroundView);
+        } else {
+            loadBackgroundPic();
         }
     }
 
@@ -194,6 +231,8 @@ public class WeatherActivity extends BaseActivity {
         navButton = (Button) findViewById(R.id.nav_button);
 
         mainLayout = (ViewGroup) findViewById(R.id.weather_main_layout);
+
+        backgroundView = (ImageView) findViewById(R.id.background_view);
     }
 
     /**
@@ -329,6 +368,28 @@ public class WeatherActivity extends BaseActivity {
         } else {
             Toast.makeText(WeatherActivity.this, "获取天气信息失败！", Toast.LENGTH_SHORT).show();
         }
+    }
+
+    private void loadBackgroundPic() {
+        HttpUtil.sendRequest(AutoUpdateService.BING_PIC_ADDR, new Callback() {
+            @Override
+            public void onFailure(Call call, IOException e) {
+                LogUtil.w(TAG, "loadBackgroundPic: IOException-" + Log.getStackTraceString(e));
+            }
+
+            @Override
+            public void onResponse(Call call, Response response) throws IOException {
+                String picAddr = response.body().string();
+                if (picAddr != null) {
+                    WeatherInfoCache.putBingPic(picAddr);
+                    runOnUiThread(() -> Glide.with(WeatherActivity.this).load(picAddr).into(backgroundView));
+
+                    LogUtil.v(TAG, "loadBackgroundPic: 设置背景图片成功");
+                } else {
+                    onFailure(call, new IOException("获取必应图片路径失败！"));
+                }
+            }
+        });
     }
 
     /**

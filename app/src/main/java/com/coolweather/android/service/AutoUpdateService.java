@@ -52,9 +52,9 @@ public class AutoUpdateService extends Service {
     public int onStartCommand(Intent intent, int flags, int startId) {
         updateWeather();
         updateBingPic();
-        if (activity != null) {
-            replaceBackground(activity);
-        }
+//        if (activity != null) {
+//            replaceBackground(activity);
+//        }
 
         AlarmManager manager = (AlarmManager) getSystemService(ALARM_SERVICE);
         long time = 8 * 60 * 60 * 1000;
@@ -123,6 +123,7 @@ public class AutoUpdateService extends Service {
         });
     }
 
+    @Deprecated
     private void replaceBackground(WeatherActivity activity) {
         LogUtil.v(TAG, "replaceBackground: 开始更新 WeatherActivity 背景图片");
 
@@ -150,6 +151,7 @@ public class AutoUpdateService extends Service {
     }
 
 
+    @Deprecated
     public class WeatherBinder extends Binder {
 
         public void setWeatherActivity(WeatherActivity activity) {
