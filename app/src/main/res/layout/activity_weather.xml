@@ -3,6 +3,7 @@
 <!-- activity_weather 将会非常长，对于这种非常长的布局文件，可以将其拆分成几个部分，
     然后通过 <include> 将各个部分应用进来-->
 <FrameLayout
+    android:id="@+id/weather_main_layout"
     xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"

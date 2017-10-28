@@ -1,13 +1,19 @@
 package com.coolweather.android.ui;
 
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.content.ServiceConnection;
+import android.graphics.drawable.Drawable;
+import android.os.Build;
 import android.os.Bundle;
+import android.os.IBinder;
 import android.support.v4.view.GravityCompat;
 import android.support.v4.widget.DrawerLayout;
 import android.support.v4.widget.SwipeRefreshLayout;
 import android.view.LayoutInflater;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
@@ -68,16 +74,44 @@ public class WeatherActivity extends BaseActivity {
     private DrawerLayout drawerLayout;
     private Button navButton;
 
+    // WeatherActivity 的主界面，用来设置背景图
+    private ViewGroup mainLayout;
+
+    // 用来绑定服务
+    private AutoUpdateService.WeatherBinder binder;
+    private ServiceConnection connection = new ServiceConnection() {
+        @Override
+        public void onServiceConnected(ComponentName componentName, IBinder iBinder) {
+            binder = (AutoUpdateService.WeatherBinder) iBinder;
+            binder.setWeatherActivity(WeatherActivity.this);
+
+            LogUtil.v(TAG, "ServiceConnection.onServiceConnected: 绑定了服务，并设置了活动对象");
+        }
+
+        @Override
+        public void onServiceDisconnected(ComponentName componentName) {
+
+        }
+    };
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_weather);
 
+        // bindService 会调用 Service 的 onCreate 方法，但是不会调用 startService 方法
+        Intent bindIntent = new Intent(this, AutoUpdateService.class);
+        bindService(bindIntent, connection, BIND_AUTO_CREATE);
         initView();
         viewSetting();
     }
 
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        unbindService(connection);
+    }
 
     /**
      * 当另一个活动需要启动 WeatherActivity 时，且没有缓存过天气数据时，需要调用这个方法。
@@ -117,6 +151,20 @@ public class WeatherActivity extends BaseActivity {
         requestWeather(weatherId);
     }
 
+    /**
+     * 设置 WeatherActivity 的背景图。需要注意的是，该方法只能在 Android 4.1 及以上的版本中才能够起作用。
+     *
+     * @param pic 背景图
+     */
+    public void setBackground(Drawable pic) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
+            mainLayout.setBackground(pic);
+            LogUtil.v(TAG, "setBackground: 设置背景图片成功");
+        } else {
+            LogUtil.w(TAG, "setBackground: 当前 Android 系统版本低于 4.1，无法使用该方法");
+        }
+    }
+
 
     /**
      * 初始化视图
@@ -144,6 +192,8 @@ public class WeatherActivity extends BaseActivity {
 
         drawerLayout = (DrawerLayout) findViewById(R.id.drawer_layout);
         navButton = (Button) findViewById(R.id.nav_button);
+
+        mainLayout = (ViewGroup) findViewById(R.id.weather_main_layout);
     }
 
     /**

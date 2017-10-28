@@ -96,6 +96,19 @@ public class WeatherInfoCache {
     }
 
     /**
+     * 获取必应每日一图信息，不存在返回 null。
+     *
+     * @return 必应每日一图信息，不存在返回 null
+     */
+    public static String getBingPic() {
+        if (prefs == null) {
+            prefs = BaseApplication.getContext().getSharedPreferences(WEATHER_INFO_PATH, Context.MODE_PRIVATE);
+        }
+
+        return prefs.getString(BING_PIC_KEY, null);
+    }
+
+    /**
      * 将必应每日一图信息保存到缓存中。
      *
      * @param bingPic 必应每日一图
